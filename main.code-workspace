@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "../../Release_2.6.10/client-1.21.11"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"java.configuration.updateBuildConfiguration": "interactive"
+	}
+}

@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"id": "learn-mod",
+	"version": "${version}",
+	"name": "Learn Mod",
+	"description": "This is an example description! Tell everyone what your mod is about!                                                                                          This mod is a learning experience for modding Minecraft.",
+	"authors": [
+		"Me!"
+	],
+	"contact": {
+		"homepage": "https://jiarui-shuai.github.io/",
+		"sources": "data:text/plain;charset=UTF-8,Not avabile"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/learn-mod/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.learn.mod.LearnMod"
+		]
+	},
+	"mixins": [
+		"learn-mod.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.18.4",
+		"minecraft": "~1.21.11",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
