@@ -22,6 +22,7 @@ import net.minecraft.world.item.Items;
 
 import com.learn.mod.util.AnsiColors;
 import com.learn.mod.cmds.DebugCommand;
+import com.learn.mod.cmds.TestCommand;
 
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -268,6 +269,9 @@ public class LearnMod implements ModInitializer {
 								return 1;
 							}
 						)
+					)
+					.then(Commands.literal("count")
+						.executes(TestCommand::execute)
 					)
 
 			);}
