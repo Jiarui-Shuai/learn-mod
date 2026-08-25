@@ -2,6 +2,8 @@ package com.learn.mod;
 
 import net.fabricmc.api.ModInitializer;
 import com.mojang.brigadier.arguments.*;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -22,7 +24,6 @@ import net.minecraft.world.item.Items;
 
 import com.learn.mod.util.AnsiColors;
 import com.learn.mod.cmds.DebugCommand;
-import com.learn.mod.cmds.TestCommand;
 
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -47,6 +48,10 @@ public class LearnMod implements ModInitializer {
 	// That way, it's clear which 1`mod wrote info, warnings, and errors.
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
+	private static final double AU_IN_BLOCKS = 10.0;   // 1天文单位 = 10格
+	private static final double YEAR_IN_SECONDS = 3.0; // 1年 = 3秒（MC快进感）
+	private static final double TICKS_PER_SECOND = 20.0;
+	private static final double TICKS_PER_YEAR = YEAR_IN_SECONDS * TICKS_PER_SECOND; // 60 ticks
 
 	@Override
 	public void onInitialize() {
@@ -117,7 +122,6 @@ public class LearnMod implements ModInitializer {
 								.then(Commands.argument("momentumVector", Vec3Argument.vec3())
 								.executes(context->{
 									Vec3 addmomentum = Vec3Argument.getVec3(context, "momentumVector");
-									LOGGER.warn(AnsiColors.rainbow(addmomentum.toString()));
 									Collection<? extends Entity> entities = EntityArgument.getEntities(context, "entity");
 									for(Entity entity : entities){
 										entity.setDeltaMovement(entity.getDeltaMovement().add(addmomentum));
@@ -125,10 +129,77 @@ public class LearnMod implements ModInitializer {
 									}
 									return 1;
 								})
+								)
+								
+							.then(Commands.literal("look")								
+							.then(Commands.argument("momentumVector", Vec3Argument.vec3())
+							.then(Commands.argument("length", DoubleArgumentType.doubleArg())
+								.executes(context -> {
+									Vec3 B = Vec3Argument.getVec3(context, "momentumVector")  ;
+									LOGGER.info(B.toString());
+									double targetLength = DoubleArgumentType.getDouble(context, "length");
+									Collection<? extends Entity> entities = EntityArgument.getEntities(context, "entity");
+									for(Entity entity : entities){
+
+										Vec3 A = entity.position();
+										Vec3 direction = A.vectorTo(B);          // 得到向量 B - A
+										Vec3 normalized = direction.normalize(); // 归一化（零向量返回 ZERO）
+										Vec3 result = normalized.scale(targetLength); // 长度变为 targetLength
+										entity.setDeltaMovement(entity.getDeltaMovement().add(result));
+										if (entity instanceof Player){
+											((Player)entity).hurtMarked = true;
+										}
+										
+									}
+									return 1;
+								})
+							)	
+							)
 							)
 						)
 
 					)
+					.then(Commands.literal("g")
+						.then(Commands.argument("GravSource", Vec3Argument.vec3())
+						.then(Commands.argument("M", StringArgumentType.word())
+						.then(Commands.argument("entity", EntityArgument.entities())
+							.executes(context -> {
+								try {
+									double M = Double.parseDouble(StringArgumentType.getString(context, "M"));
+									Vec3 B = Vec3Argument.getVec3(context, "GravSource");
+									Collection<? extends Entity> entities = EntityArgument.getEntities(context, "entity");
+									for(Entity entity : entities){
+										Vec3 A = entity.position();
+										double r = A.distanceTo(B);
+										double a = 4*Math.PI*Math.PI*M/(r*r); // AU/yr
+										a /= YEAR_IN_SECONDS * TICKS_PER_SECOND;
+										LOGGER.info(((Double)a).toString());
+										Vec3 direction = A.vectorTo(B); 
+										Vec3 normalized = direction.normalize();
+										Vec3 result = normalized.scale(a);
+										entity.setDeltaMovement(entity.getDeltaMovement().add(result));
+										if (entity instanceof Player){
+											((Player)entity).hurtMarked = true;
+										}
+										
+									}
+									return 1;
+								} catch (NumberFormatException e) {
+									throw CommandSyntaxException.BUILT_IN_EXCEPTIONS
+										.readerInvalidDouble()
+										.create(StringArgumentType.getString(context, "M"));
+								}
+
+							})
+							.then(Commands.argument("G", DoubleArgumentType.doubleArg())
+								.executes(context -> {
+									return 1;
+								})
+							)
+						)
+						)
+						)
+					) // a=GM/r^2
 					.then(Commands.literal("debug")
 						.then(Commands.argument("entity", EntityArgument.entity())
 							.executes(DebugCommand::execute)
@@ -139,52 +210,52 @@ public class LearnMod implements ModInitializer {
 						.executes(context -> {
 								context.getSource().sendSuccess(
 								() -> net.minecraft.network.chat.Component.literal("""
-								We're no strangers to love
-								You know the rules and so do I
-								A full commitment's what I'm thinking of
-								You wouldn't get this from any other guy
-								I just wanna tell you how I'm feeling
-								Gotta make you understand
-								Never gonna give you up never gonna let you down
-								Never gonna run around and desert you
-								Never gonna make you cry never gonna say goodbye
-								Never gonna tell a lie and hurt you
-								We've known each other for so long
-								Your heart's been aching but you're too shy to say it
-								Inside we both know what's been going on
-								We know the game and we're gonna play it
-								And if you ask me how I'm feeling
-								Don't tell me you're too blind to see
-								Never gonna give you up never gonna let you down
-								Never gonna run around and desert you
-								Never gonna make you cry never gonna say goodbye
-								Never gonna tell a lie and hurt you
-								Never gonna give you up never gonna let you down
-								Never gonna run around and desert you
-								Never gonna make you cry never gonna say goodbye
-								Never gonna tell a lie and hurt you
-								(Ooh give you up)
-								(Ooh give you up)
-								(Ooh) never gonna give never gonna give (give you up)
-								(Ooh) never gonna give never gonna give (give you up)
-								We've known each other for so long
-								Your heart's been aching but you're too shy to say it
-								Inside we both know what's been going on
-								We know the game and we're gonna play it
-								I just wanna tell you how I'm feeling
-								Gotta make you understand
-								Never gonna give you up never gonna let you down
-								Never gonna run around and desert you
-								Never gonna make you cry never gonna say goodbye
-								Never gonna tell a lie and hurt you
-								Never gonna give you up never gonna let you down
-								Never gonna run around and desert you
-								Never gonna make you cry never gonna say goodbye
-								Never gonna tell a lie and hurt you
-								Never gonna give you up never gonna let you down
-								Never gonna run around and desert you
-								Never gonna make you cry never gonna say goodbye
-								Never gonna tell a lie and hurt you
+									We're no strangers to love
+									You know the rules and so do I
+									A full commitment's what I'm thinking of
+									You wouldn't get this from any other guy
+									I just wanna tell you how I'm feeling
+									Gotta make you understand
+									Never gonna give you up never gonna let you down
+									Never gonna run around and desert you
+									Never gonna make you cry never gonna say goodbye
+									Never gonna tell a lie and hurt you
+									We've known each other for so long
+									Your heart's been aching but you're too shy to say it
+									Inside we both know what's been going on
+									We know the game and we're gonna play it
+									And if you ask me how I'm feeling
+									Don't tell me you're too blind to see
+									Never gonna give you up never gonna let you down
+									Never gonna run around and desert you
+									Never gonna make you cry never gonna say goodbye
+									Never gonna tell a lie and hurt you
+									Never gonna give you up never gonna let you down
+									Never gonna run around and desert you
+									Never gonna make you cry never gonna say goodbye
+									Never gonna tell a lie and hurt you
+									(Ooh give you up)
+									(Ooh give you up)
+									(Ooh) never gonna give never gonna give (give you up)
+									(Ooh) never gonna give never gonna give (give you up)
+									We've known each other for so long
+									Your heart's been aching but you're too shy to say it
+									Inside we both know what's been going on
+									We know the game and we're gonna play it
+									I just wanna tell you how I'm feeling
+									Gotta make you understand
+									Never gonna give you up never gonna let you down
+									Never gonna run around and desert you
+									Never gonna make you cry never gonna say goodbye
+									Never gonna tell a lie and hurt you
+									Never gonna give you up never gonna let you down
+									Never gonna run around and desert you
+									Never gonna make you cry never gonna say goodbye
+									Never gonna tell a lie and hurt you
+									Never gonna give you up never gonna let you down
+									Never gonna run around and desert you
+									Never gonna make you cry never gonna say goodbye
+									Never gonna tell a lie and hurt you
 									"""),
 								false
 							);
@@ -269,9 +340,6 @@ public class LearnMod implements ModInitializer {
 								return 1;
 							}
 						)
-					)
-					.then(Commands.literal("count")
-						.executes(TestCommand::execute)
 					)
 
 			);}

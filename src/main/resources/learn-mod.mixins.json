@@ -4,8 +4,7 @@
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
 		"ExampleMixin",
-		"OnHurt",
-		"OnMove"
+		"OnHurt"
 	],
 	"injectors": {
 		"defaultRequire": 1
