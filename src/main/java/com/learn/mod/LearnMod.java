@@ -1,6 +1,7 @@
 package com.learn.mod;
 
 import net.fabricmc.api.ModInitializer;
+
 import com.mojang.brigadier.arguments.*;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 
@@ -18,11 +19,13 @@ import java.net.URI;
 import java.util.Collection;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
 import com.learn.mod.util.AnsiColors;
+import com.learn.mod.util.Configs;
 import com.learn.mod.cmds.DebugCommand;
 
 import net.minecraft.network.chat.ClickEvent;
@@ -48,16 +51,17 @@ public class LearnMod implements ModInitializer {
 	// That way, it's clear which 1`mod wrote info, warnings, and errors.
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
-	private static final double AU_IN_BLOCKS = 10.0;   // 1天文单位 = 10格
 	private static final double YEAR_IN_SECONDS = 3.0; // 1年 = 3秒（MC快进感）
 	private static final double TICKS_PER_SECOND = 20.0;
-	private static final double TICKS_PER_YEAR = YEAR_IN_SECONDS * TICKS_PER_SECOND; // 60 ticks
+	private static final double AU_PER_BLOCKS = 5.0;
+	private static long lastsetDvGametime = 0;
 
 	@Override
 	public void onInitialize() {
 		// This code runs as soon as Minecraft is in a mod-load-ready state.
 		// However, some things (like resources) may still be uninitialized.
 		// Proceed with mild caution.
+		// long windowHandle = Minecraft.getInstance().getWindow().handle();
 
     	LOGGER.info("Hello Fabric world!");
 		Identifier id = Identifier.fromNamespaceAndPath(MOD_ID, "testid");
@@ -125,7 +129,9 @@ public class LearnMod implements ModInitializer {
 									Collection<? extends Entity> entities = EntityArgument.getEntities(context, "entity");
 									for(Entity entity : entities){
 										entity.setDeltaMovement(entity.getDeltaMovement().add(addmomentum));
-										
+										if (entity instanceof Player){
+											((Player)entity).hurtMarked = true;
+										}
 									}
 									return 1;
 								})
@@ -164,16 +170,34 @@ public class LearnMod implements ModInitializer {
 						.then(Commands.argument("M", StringArgumentType.word())
 						.then(Commands.argument("entity", EntityArgument.entities())
 							.executes(context -> {
+								long gt = context.getSource().getLevel().getGameTime();
+								if(gt == lastsetDvGametime+1){
+									return 1;
+								}
 								try {
+									lastsetDvGametime = gt;
 									double M = Double.parseDouble(StringArgumentType.getString(context, "M"));
 									Vec3 B = Vec3Argument.getVec3(context, "GravSource");
+									double Rs = 2*(6.674e-11)*(M*1.9891e30) / (299792458.0*299792458.0) / 1.5e8 * AU_PER_BLOCKS;
+									LOGGER.info("Rs = {}", Rs);
 									Collection<? extends Entity> entities = EntityArgument.getEntities(context, "entity");
 									for(Entity entity : entities){
 										Vec3 A = entity.position();
 										double r = A.distanceTo(B);
+										// LOGGER.info("OOOOOOh, My God");
+										if (r < Rs){
+											if (entity instanceof LivingEntity) {
+												if (r <= 0.001) {
+													continue;
+												} else {
+													entity.hurtServer(context.getSource().getLevel() ,context.getSource().getLevel().damageSources().generic(), Float.MAX_VALUE);
+													// coStinue;
+
+												}
+											}
+										}
 										double a = 4*Math.PI*Math.PI*M/(r*r); // AU/yr
 										a /= YEAR_IN_SECONDS * TICKS_PER_SECOND;
-										LOGGER.info(((Double)a).toString());
 										Vec3 direction = A.vectorTo(B); 
 										Vec3 normalized = direction.normalize();
 										Vec3 result = normalized.scale(a);
@@ -181,19 +205,68 @@ public class LearnMod implements ModInitializer {
 										if (entity instanceof Player){
 											((Player)entity).hurtMarked = true;
 										}
-										
 									}
+									context.getSource().sendSuccess(
+										() -> Component.literal("成功! "), 
+									false);
 									return 1;
 								} catch (NumberFormatException e) {
+									context.getSource().sendFailure(Component.literal("Arg M is not good"));
 									throw CommandSyntaxException.BUILT_IN_EXCEPTIONS
 										.readerInvalidDouble()
 										.create(StringArgumentType.getString(context, "M"));
 								}
 
 							})
-							.then(Commands.argument("G", DoubleArgumentType.doubleArg())
+							.then(Commands.argument("G", StringArgumentType.word())
 								.executes(context -> {
-									return 1;
+									long gt = context.getSource().getLevel().getGameTime();
+									if(gt == lastsetDvGametime+1){
+										return 1;
+									}
+									try {
+										lastsetDvGametime = gt;
+										double G = Double.parseDouble(StringArgumentType.getString(context, "G"));
+										double M = Double.parseDouble(StringArgumentType.getString(context, "M"));
+										Vec3 B = Vec3Argument.getVec3(context, "GravSource");
+										double Rs = 2*(G)*(M*1.9891e30) / (299792458.0*299792458.0) / 1.5e8 * AU_PER_BLOCKS;
+										LOGGER.info("Rs = {}", Rs);
+										Collection<? extends Entity> entities = EntityArgument.getEntities(context, "entity");
+										for(Entity entity : entities){
+											Vec3 A = entity.position();
+											double r = A.distanceTo(B);
+											// LOGGER.info("OOOOOOh, My God");
+											if (r < Rs){
+												if (entity instanceof LivingEntity) {
+													if (r <= 0.001) {
+														continue;
+													} else {
+														entity.hurtServer(context.getSource().getLevel() ,context.getSource().getLevel().damageSources().generic(), Float.MAX_VALUE);
+														// coStinue;
+
+													}
+												}
+											}
+											double a = G*M/(r*r); // AU/yr
+											a /= YEAR_IN_SECONDS * TICKS_PER_SECOND;
+											Vec3 direction = A.vectorTo(B); 
+											Vec3 normalized = direction.normalize();
+											Vec3 result = normalized.scale(a);
+											entity.setDeltaMovement(entity.getDeltaMovement().add(result));
+											if (entity instanceof Player){
+												((Player)entity).hurtMarked = true;
+											}
+										}
+										context.getSource().sendSuccess(
+											() -> Component.literal("成功! "), 
+										false);
+										return 1;
+									} catch (NumberFormatException e) {
+										context.getSource().sendFailure(Component.literal("Arg M / G is not good"));
+										throw CommandSyntaxException.BUILT_IN_EXCEPTIONS
+											.readerInvalidDouble()
+											.create(StringArgumentType.getString(context, "G"));
+									}
 								})
 							)
 						)
@@ -203,6 +276,11 @@ public class LearnMod implements ModInitializer {
 					.then(Commands.literal("debug")
 						.then(Commands.argument("entity", EntityArgument.entity())
 							.executes(DebugCommand::execute)
+						)
+						.then(Commands.literal("crash")
+							.executes(context -> {
+								throw new NullPointerException();
+							})
 						)
 
 					)
@@ -341,6 +419,18 @@ public class LearnMod implements ModInitializer {
 							}
 						)
 					)
+					.then(Commands.literal("config")
+					.then(Commands.literal("enabledHurtInfo")
+					.then(Commands.argument("enabledHurtInfo", BoolArgumentType.bool())
+					.executes(context -> {
+						Configs.setEnabledHurtInfo(BoolArgumentType.getBool(context, "enabledHurtInfo"));
+						context.getSource().sendSuccess(
+							() -> Component.literal("已将启用受伤刷屏设置为 %b".formatted(BoolArgumentType.getBool(context, "enabledHurtInfo"))), 
+						false);
+						return 1;
+					})
+					)
+					))
 
 			);}
 		);
